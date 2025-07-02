@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>텍스트 어드벤처 게임</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        
+        .game-container {
+            background-color: #2d2d2d;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .character-stats {
+            background-color: #3a3a3a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            background-color: #4a4a4a;
+            padding: 8px 12px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .story-text {
+            background-color: #404040;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            min-height: 100px;
+            font-size: 16px;
+        }
+        
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .choice-btn {
+            background-color: #555;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .choice-btn:hover {
+            background-color: #666;
+        }
+        
+        .choice-btn:disabled {
+            background-color: #333;
+            color: #888;
+            cursor: not-allowed;
+        }
+        
+        .game-title {
+            text-align: center;
+            color: #ffd700;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        
+        .inventory-btn {
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .inventory-btn:hover {
+            background-color: #5a5a5a;
+        }
+        
+        .inventory {
+            background-color: #3a3a3a;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 2px solid #555;
+        }
+        
+        .inventory h3 {
+            color: #ffd700;
+            margin: 0 0 15px 0;
+            text-align: center;
+        }
+        
+        .inventory-items {
+            background-color: #4a4a4a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+        
+        .item {
+            background-color: #555;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 3px;
+            display: inline-block;
+            color: #e0e0e0;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .game-container {
+                padding: 20px;
+            }
+            
+            .character-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">🗡️ 도리의 모험 🗡️</h1>
+        
+        <div class="character-stats">
+            <div class="stat">체력: <span id="health">100</span>/100</div>
+            <div class="stat">골드: <span id="gold">50</span></div>
+            <div class="stat">경험치: <span id="exp">0</span></div>
+            <div class="stat inventory-btn" onclick="toggleInventory()">🎒 가방</div>
+        </div>
+        
+        <div class="inventory" id="inventory" style="display: none;">
+            <h3>아이템 가방</h3>
+            <div class="inventory-items" id="inventory-items">
+                아이템이 없습니다.
+            </div>
+            <button class="choice-btn" onclick="toggleInventory()">닫기</button>
+        </div>
+        
+        <div class="story-text" id="story-text">
+            어느 마을에 도리라는 청년이 살고 있었다. 
+            어느날 도리는 새로운 모험을 떠나기로 결심했다.
+            집을 나서며 배낭을 메고 길을 걷기 시작했다.
+        </div>
+        
+        <div class="choices" id="choices">
+            <button class="choice-btn" onclick="startGame()">모험 시작하기</button>
+        </div>
+    </div>
+
+    <script>
+        // 게임 상태
+        let gameState = {
+            health: 100,
+            gold: 50,
+            exp: 0,
+            currentEvent: null,
+            usedEvents: [],
+            flags: {},
+            items: {}
+        };
+
+        // 게임 이벤트 데이터
+        const events = [
+            {
+                id: 'merchant',
+                text: '도리는 여행 중 늙은 상인을 만났다.\n\n상인: "이 신비한 물약을 사시겠습니까? 단 30골드입니다."',
+                choices: [
+                    { text: '물약을 산다', cost: 30, effect: () => ({}), probability: 100, flag: 'bought_potion', item: 'healing_potion' },
+                    { text: '안 산다', effect: () => ({}), probability: 100 },
+                    { text: '물약을 빼앗는다 (성공확률 50%)', effect: () => ({}), probability: 50, success: () => ({}), failure: () => ({ health: -10 }), flag: 'robbed_merchant', item: 'healing_potion' }
+                ]
+            },
+            {
+                id: 'children',
+                text: '도리는 아이들이 놀이를 하는 것을 발견했다.\n\n아이들이 즐겁게 공놀이를 하고 있다.',
+                choices: [
+                    { text: '함께 놀아준다', effect: () => ({ exp: 10 }), probability: 100, flag: 'helped_children' },
+                    { text: '그냥 지나친다', effect: () => ({}), probability: 100 },
+                    { text: '놀이를 방해한다', effect: () => ({ exp: -5, gold: 10 }), probability: 100, flag: 'bullied_children' }
+                ]
+            },
+            {
+                id: 'treasure',
+                text: '도리는 길가에서 반짝이는 무언가를 발견했다.\n\n땅에 묻힌 작은 보물상자가 보인다.',
+                choices: [
+                    { text: '상자를 판다', effect: () => ({ gold: 25, exp: 5 }), probability: 100 },
+                    { text: '무시하고 지나간다', effect: () => ({}), probability: 100 },
+                    { text: '조심스럽게 조사한다', effect: () => ({}), probability: 70, success: () => ({ gold: 50, exp: 10 }), failure: () => ({ health: -15 }) }
+                ]
+            },
+            {
+                id: 'angry_merchant',
+                text: '도리 앞에 화난 상인이 나타났다!\n\n상인: "네가 내 물약을 훔쳐간 도둑이구나! 복수하러 왔다!"',
+                condition: () => gameState.flags.robbed_merchant,
+                choices: [
+                    { text: '사과한다', effect: () => ({ gold: -20, exp: 5 }), probability: 100 },
+                    { text: '도망친다 (성공확률 60%)', effect: () => ({}), probability: 60, success: () => ({}), failure: () => ({ health: -20 }) },
+                    { text: '맞서 싸운다 (성공확률 40%)', effect: () => ({}), probability: 40, success: () => ({ gold: 40, exp: 15 }), failure: () => ({ health: -30 }) }
+                ]
+            },
+            {
+                id: 'grateful_children',
+                text: '도리가 전에 도와준 아이들이 달려왔다!\n\n아이: "언니! 이거 드릴게요!" 아이가 작은 선물을 건넸다.',
+                condition: () => gameState.flags.helped_children,
+                choices: [
+                    { text: '고맙게 받는다', effect: () => ({ health: 15, exp: 5 }), probability: 100 },
+                    { text: '사양한다', effect: () => ({ exp: 10 }), probability: 100 }
+                ]
+            },
+            {
+                id: 'forest_path',
+                text: '도리는 어두운 숲길에 들어섰다.\n\n길이 두 갈래로 나뉘어져 있다.',
+                choices: [
+                    { text: '밝은 길로 간다', effect: () => ({}), probability: 80, success: () => ({ exp: 5 }), failure: () => ({ health: -5 }) },
+                    { text: '어두운 길로 간다', effect: () => ({}), probability: 50, success: () => ({ gold: 30, exp: 10 }), failure: () => ({ health: -20 }) },
+                    { text: '돌아간다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'mysterious_wizard',
+                text: '도리는 신비한 마법사를 만났다.\n\n마법사: "젊은 모험가여, 시험을 받아보겠는가?"',
+                choices: [
+                    { text: '시험을 받는다', effect: () => ({}), probability: 60, success: () => ({ health: 30, gold: 20, exp: 20 }), failure: () => ({ health: -15, exp: 5 }) },
+                    { text: '정중히 거절한다', effect: () => ({ exp: 3 }), probability: 100 },
+                    { text: '무시하고 지나간다', effect: () => ({ health: -10 }), probability: 100 }
+                ]
+            },
+            {
+                id: 'tavern',
+                text: '도리는 시끌벅적한 여관에 도착했다.\n\n여관 주인이 반갑게 맞아준다.',
+                choices: [
+                    { text: '식사를 한다 (20골드)', cost: 20, effect: () => ({ health: 25 }), probability: 100 },
+                    { text: '정보를 수집한다', effect: () => ({ exp: 8 }), probability: 100 },
+                    { text: '도박을 한다 (30골드)', cost: 30, effect: () => ({}), probability: 50, success: () => ({ gold: 60 }), failure: () => ({}) }
+                ]
+            },
+            {
+                id: 'bandits',
+                text: '도리 앞에 산적들이 나타났다!\n\n산적: "지나가려면 통행료를 내놔!"',
+                choices: [
+                    { text: '돈을 준다 (25골드)', cost: 25, effect: () => ({}), probability: 100 },
+                    { text: '싸운다 (성공확률 45%)', effect: () => ({}), probability: 45, success: () => ({ gold: 35, exp: 15 }), failure: () => ({ health: -25, gold: -15 }) },
+                    { text: '설득한다 (성공확률 30%)', effect: () => ({}), probability: 30, success: () => ({ exp: 12 }), failure: () => ({ health: -20 }) }
+                ]
+            },
+            {
+                id: 'injured_traveler',
+                text: '도리는 길가에 다친 여행자를 발견했다.\n\n여행자: "도와주세요... 다리를 다쳤어요."',
+                choices: [
+                    { text: '치료해준다', effect: () => ({ exp: 12, health: -5 }), probability: 100, flag: 'helped_traveler' },
+                    { text: '물약을 준다', condition: () => gameState.items.healing_potion > 0, effect: () => ({ exp: 20 }), probability: 100, useItem: 'healing_potion' },
+                    { text: '지나간다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'grateful_traveler',
+                text: '도리가 전에 도와준 여행자가 나타났다!\n\n여행자: "당신 덕분에 살았습니다. 이 보답을 받아주세요."',
+                condition: () => gameState.flags.helped_traveler,
+                choices: [
+                    { text: '보상을 받는다', effect: () => ({ gold: 40, exp: 10 }), probability: 100 },
+                    { text: '사양한다', effect: () => ({ exp: 15 }), probability: 100 }
+                ]
+            },
+            {
+                id: 'magic_shop',
+                text: '도리는 신비한 마법 상점을 발견했다.\n\n마법사: "어서오세요! 특별한 물건들을 판매하고 있습니다."',
+                choices: [
+                    { text: '체력 물약을 산다 (40골드)', cost: 40, effect: () => ({}), probability: 100, item: 'healing_potion' },
+                    { text: '행운의 부적을 산다 (60골드)', cost: 60, effect: () => ({}), probability: 100, item: 'lucky_charm' },
+                    { text: '둘러보기만 한다', effect: () => ({ exp: 5 }), probability: 100 }
+                ]
+            },
+            {
+                id: 'sick_tree',
+                text: '도리는 시들어가는 거대한 나무를 발견했다.\n\n나무가 병들어 보인다. 뭔가 도움이 필요해 보인다.',
+                choices: [
+                    { text: '물약을 뿌려준다', condition: () => gameState.items.healing_potion > 0, effect: () => ({ exp: 25, gold: 30 }), probability: 100, useItem: 'healing_potion' },
+                    { text: '나무를 조사한다', effect: () => ({ exp: 8 }), probability: 100 },
+                    { text: '지나친다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'lucky_find',
+                text: '도리는 험한 절벽 길을 걷고 있다.\n\n발밑이 위험해 보이지만 저편에 보물이 보인다.',
+                choices: [
+                    { text: '조심스럽게 간다', effect: () => ({}), probability: 40, success: () => ({ gold: 50, exp: 15 }), failure: () => ({ health: -25 }) },
+                    { text: '행운의 부적을 사용한다', condition: () => gameState.items.lucky_charm > 0, effect: () => ({ gold: 80, exp: 20 }), probability: 100, useItem: 'lucky_charm' },
+                    { text: '포기한다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'mysterious_cave',
+                text: '도리는 어두운 동굴을 발견했다.\n\n동굴 안에서 신비한 빛이 새어나오고 있다.',
+                choices: [
+                    { text: '동굴에 들어간다', effect: () => ({}), probability: 60, success: () => ({ gold: 45, exp: 18 }), failure: () => ({ health: -20 }) },
+                    { text: '물약을 마시고 들어간다', condition: () => gameState.items.healing_potion > 0, effect: () => ({ gold: 60, exp: 25 }), probability: 100, useItem: 'healing_potion' },
+                    { text: '되돌아간다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'lost_child',
+                text: '도리는 울고 있는 아이를 만났다.\n\n아이: "엄마를 찾을 수가 없어요..."',
+                choices: [
+                    { text: '아이를 도와준다', effect: () => ({ exp: 15, health: -10 }), probability: 100, flag: 'helped_lost_child' },
+                    { text: '물약을 주며 위로한다', condition: () => gameState.items.healing_potion > 0, effect: () => ({ exp: 20 }), probability: 100, useItem: 'healing_potion' },
+                    { text: '지나친다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'grateful_mother',
+                text: '도리가 도와준 아이의 어머니가 나타났다!\n\n어머니: "제 아이를 도와주셔서 감사합니다!"',
+                condition: () => gameState.flags.helped_lost_child,
+                choices: [
+                    { text: '보상을 받는다', effect: () => ({ gold: 35, exp: 12 }), probability: 100, item: 'healing_potion' },
+                    { text: '사양한다', effect: () => ({ exp: 18 }), probability: 100 }
+                ]
+            },
+            {
+                id: 'ancient_ruins',
+                text: '도리는 고대 유적을 발견했다.\n\n유적 앞에 "용기 있는 자만이 보물을 얻으리라"는 글이 새겨져 있다.',
+                choices: [
+                    { text: '유적에 들어간다', effect: () => ({}), probability: 50, success: () => ({ gold: 70, exp: 30 }), failure: () => ({ health: -30 }) },
+                    { text: '행운의 부적과 함께 들어간다', condition: () => gameState.items.lucky_charm > 0, effect: () => ({ gold: 100, exp: 40 }), probability: 100, useItem: 'lucky_charm' },
+                    { text: '돌아간다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'potion_seller',
+                text: '도리는 길가에서 물약을 파는 할머니를 만났다.\n\n할머니: "젊은이, 좋은 물약이 있는데 사겠나?"',
+                choices: [
+                    { text: '물약을 산다 (35골드)', cost: 35, effect: () => ({}), probability: 100, item: 'healing_potion' },
+                    { text: '할머니와 대화한다', effect: () => ({ exp: 8 }), probability: 100 },
+                    { text: '지나간다', effect: () => ({}), probability: 100 }
+                ]
+            },
+            {
+                id: 'bridge_troll',
+                text: '도리는 다리 앞에서 거대한 트롤을 만났다!\n\n트롤: "다리를 건너려면 나와 내기를 해야 한다!"',
+                choices: [
+                    { text: '내기를 받아들인다', effect: () => ({}), probability: 50, success: () => ({ gold: 60, exp: 20 }), failure: () => ({ health: -20, gold: -30 }) },
+                    { text: '행운의 부적을 사용한다', condition: () => gameState.items.lucky_charm > 0, effect: () => ({ gold: 90, exp: 25 }), probability: 100, useItem: 'lucky_charm' },
+                    { text: '돌아간다', effect: () => ({}), probability: 100 }
+                ]
+            }
+        ];
+
+        function updateStats() {
+            document.getElementById('health').textContent = gameState.health;
+            document.getElementById('gold').textContent = gameState.gold;
+            document.getElementById('exp').textContent = gameState.exp;
+            updateInventoryDisplay();
+        }
+        
+        function updateInventoryDisplay() {
+            const inventoryItems = document.getElementById('inventory-items');
+            const items = gameState.items;
+            
+            if (Object.keys(items).length === 0 || Object.values(items).every(count => count === 0)) {
+                inventoryItems.innerHTML = '아이템이 없습니다.';
+                return;
+            }
+            
+            let itemsHtml = '';
+            if (items.healing_potion > 0) {
+                itemsHtml += `<div class="item">🧪 체력 물약 x${items.healing_potion}</div>`;
+            }
+            if (items.lucky_charm > 0) {
+                itemsHtml += `<div class="item">🍀 행운의 부적 x${items.lucky_charm}</div>`;
+            }
+            
+            inventoryItems.innerHTML = itemsHtml;
+        }
+        
+        function toggleInventory() {
+            const inventory = document.getElementById('inventory');
+            if (inventory.style.display === 'none') {
+                inventory.style.display = 'block';
+                updateInventoryDisplay();
+            } else {
+                inventory.style.display = 'none';
+            }
+        }
+
+        function getRandomEvent() {
+            // 조건을 만족하고 아직 사용되지 않은 이벤트만 필터링
+            const availableEvents = events.filter(event => {
+                // 이미 사용된 이벤트는 제외
+                if (gameState.usedEvents.includes(event.id)) {
+                    return false;
+                }
+                
+                // 조건이 있는 이벤트는 조건 확인
+                if (event.condition) {
+                    return event.condition();
+                }
+                
+                return true;
+            });
+            
+            // 사용 가능한 이벤트가 없으면 게임 종료
+            if (availableEvents.length === 0) {
+                showGameEnd();
+                return null;
+            }
+            
+            return availableEvents[Math.floor(Math.random() * availableEvents.length)];
+        }
+
+        function startGame() {
+            showRandomEvent();
+        }
+
+        function showRandomEvent() {
+            const event = getRandomEvent();
+            if (!event) return; // 게임이 종료된 경우
+            
+            gameState.currentEvent = event;
+            gameState.usedEvents.push(event.id);
+            
+            document.getElementById('story-text').textContent = event.text;
+            
+            const choicesDiv = document.getElementById('choices');
+            choicesDiv.innerHTML = '';
+            
+            event.choices.forEach((choice, index) => {
+                // 조건이 있는 선택지는 조건 확인
+                if (choice.condition && !choice.condition()) {
+                    return;
+                }
+                
+                const button = document.createElement('button');
+                button.className = 'choice-btn';
+                button.textContent = choice.text;
+                button.onclick = () => makeChoice(choice);
+                
+                if (choice.cost && gameState.gold < choice.cost) {
+                    button.disabled = true;
+                    button.textContent += ' (골드 부족)';
+                }
+                
+                choicesDiv.appendChild(button);
+            });
+        }
+
+        function makeChoice(choice) {
+            let result = '';
+            let effects = {};
+            
+            if (choice.cost && gameState.gold >= choice.cost) {
+                gameState.gold -= choice.cost;
+                effects = choice.effect();
+            } else if (!choice.cost) {
+                if (choice.probability === 100) {
+                    effects = choice.effect();
+                } else {
+                    const success = Math.random() * 100 <= choice.probability;
+                    if (success && choice.success) {
+                        effects = choice.success();
+                        result = '성공! ';
+                    } else if (!success && choice.failure) {
+                        effects = choice.failure();
+                        result = '실패... ';
+                    } else {
+                        effects = choice.effect();
+                    }
+                }
+            }
+            
+            // 플래그 설정
+            if (choice.flag) {
+                gameState.flags[choice.flag] = true;
+            }
+            
+            Object.keys(effects).forEach(key => {
+                if (key === 'health') {
+                    gameState[key] = Math.min(100, gameState[key] + effects[key]);
+                } else {
+                    gameState[key] += effects[key];
+                }
+            });
+            
+            // 아이템 추가
+            if (choice.item) {
+                gameState.items[choice.item] = (gameState.items[choice.item] || 0) + 1;
+            }
+            
+            // 아이템 사용
+            if (choice.useItem) {
+                gameState.items[choice.useItem] = Math.max(0, (gameState.items[choice.useItem] || 0) - 1);
+            }
+            
+            if (gameState.health <= 0) {
+                gameState.health = 0;
+                showGameOver();
+                return;
+            }
+            
+            updateStats();
+            
+            let resultText = result;
+            if (effects.health > 0) resultText += `체력이 ${effects.health} 회복되었다. `;
+            if (effects.health < 0) resultText += `체력이 ${Math.abs(effects.health)} 감소했다. `;
+            if (effects.gold > 0) resultText += `${effects.gold} 골드를 얻었다. `;
+            if (effects.gold < 0) resultText += `${Math.abs(effects.gold)} 골드를 잃었다. `;
+            if (effects.exp > 0) resultText += `${effects.exp} 경험치를 얻었다. `;
+            if (effects.exp < 0) resultText += `${Math.abs(effects.exp)} 경험치를 잃었다. `;
+            
+            setTimeout(() => {
+                document.getElementById('story-text').textContent = resultText + '\n\n도리는 계속해서 모험을 이어갔다...';
+                
+                setTimeout(() => {
+                    showRandomEvent();
+                }, 2000);
+            }, 1000);
+        }
+
+        function showGameOver() {
+            document.getElementById('story-text').textContent = '도리의 체력이 바닥났다...\n\n게임 오버!';
+            
+            const choicesDiv = document.getElementById('choices');
+            choicesDiv.innerHTML = '';
+            
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'choice-btn';
+            restartBtn.textContent = '다시 시작하기';
+            restartBtn.onclick = () => {
+                gameState = { health: 100, gold: 50, exp: 0, currentEvent: null, usedEvents: [], flags: {}, items: {} };
+                updateStats();
+                document.getElementById('story-text').textContent = '도리는 새로운 모험을 떠나기로 결심했다. 집을 나서며 배낭을 메고 길을 걷기 시작했다.';
+                choicesDiv.innerHTML = '<button class="choice-btn" onclick="startGame()">모험 시작하기</button>';
+            };
+            
+            choicesDiv.appendChild(restartBtn);
+        }
+
+        function showGameEnd() {
+            const totalScore = gameState.health + gameState.gold + (gameState.exp * 2);
+            let rank = '';
+            
+            if (totalScore >= 300) rank = '전설의 모험가';
+            else if (totalScore >= 250) rank = '숙련된 모험가';
+            else if (totalScore >= 200) rank = '경험있는 모험가';
+            else if (totalScore >= 150) rank = '초보 모험가';
+            else rank = '견습 모험가';
+            
+            document.getElementById('story-text').textContent = 
+                `도리의 모험이 끝났다!\n\n` +
+                `=== 최종 결과 ===\n` +
+                `체력: ${gameState.health}\n` +
+                `골드: ${gameState.gold}\n` +
+                `경험치: ${gameState.exp}\n\n` +
+                `총점: ${totalScore}점\n` +
+                `등급: ${rank}\n\n` +
+                `모든 이벤트를 경험한 도리는 집으로 돌아갔다.`;
+            
+            const choicesDiv = document.getElementById('choices');
+            choicesDiv.innerHTML = '';
+            
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'choice-btn';
+            restartBtn.textContent = '새로운 모험 시작하기';
+            restartBtn.onclick = () => {
+                gameState = { health: 100, gold: 50, exp: 0, currentEvent: null, usedEvents: [], flags: {}, items: {} };
+                updateStats();
+                document.getElementById('story-text').textContent = '도리는 새로운 모험을 떠나기로 결심했다. 집을 나서며 배낭을 메고 길을 걷기 시작했다.';
+                choicesDiv.innerHTML = '<button class="choice-btn" onclick="startGame()">모험 시작하기</button>';
+            };
+            
+            choicesDiv.appendChild(restartBtn);
+        }
+    </script>
+</body>
+</html>
