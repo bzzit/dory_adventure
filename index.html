@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>텍스트 어드벤처 게임</title>
+    <title>도리의 모험</title>
     <style>
         body {
             font-family: 'Malgun Gothic', Arial, sans-serif;
@@ -185,8 +185,8 @@
         <div class="event-image" id="event-image" style="display: none;"></div>
         
         <div class="story-text" id="story-text">
-            어느 마을에 도리라는 청년이 살고 있었다. 
-            어느날 도리는 새로운 모험을 떠나기로 결심했다.
+            어느 마을에 도리라는 모험가가 살고 있었다. 
+            어느날 도리는 부와 명예를 얻기 위한 새로운 모험을 떠나기로 결심했다.
             집을 나서며 배낭을 메고 길을 걷기 시작했다.
         </div>
         
@@ -251,7 +251,7 @@
             },
             {
                 id: 'grateful_children',
-                text: '도리가 전에 도와준 아이들이 달려왔다!\n\n아이: "언니! 이거 드릴게요!" 아이가 작은 선물을 건넸다.',
+                text: '도리가 전에 놀아준 아이들이 달려왔다!\n\n아이: "도리! 이거 드릴게요!" 아이가 작은 선물을 건넸다.',
                 condition: () => gameState.flags.helped_children,
                 choices: [
                     { text: '고맙게 받는다', effect: () => ({ health: 15, exp: 5 }), probability: 100 },
