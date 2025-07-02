@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>텍스트 어드벤처 게임</title>
+    <title>도리의 모험</title>
     <style>
         body {
             font-family: 'Malgun Gothic', Arial, sans-serif;
@@ -46,6 +46,19 @@
             margin-bottom: 20px;
             min-height: 100px;
             font-size: 16px;
+        }
+        
+        .event-image {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            color: #a0a0a0;
+            border: 1px solid #555;
         }
         
         .choices {
@@ -157,6 +170,8 @@
             <button class="choice-btn" onclick="toggleInventory()">닫기</button>
         </div>
         
+        <div class="event-image" id="event-image" style="display: none;"></div>
+        
         <div class="story-text" id="story-text">
             어느 마을에 도리라는 청년이 살고 있었다. 
             어느날 도리는 새로운 모험을 떠나기로 결심했다.
@@ -185,6 +200,7 @@
             {
                 id: 'merchant',
                 text: '도리는 여행 중 늙은 상인을 만났다.\n\n상인: "이 신비한 물약을 사시겠습니까? 단 30골드입니다."',
+                
                 choices: [
                     { text: '물약을 산다', cost: 30, effect: () => ({}), probability: 100, flag: 'bought_potion', item: 'healing_potion' },
                     { text: '안 산다', effect: () => ({}), probability: 100 },
@@ -554,25 +570,128 @@
             choicesDiv.appendChild(restartBtn);
         }
 
-        function showGameEnd() {
-            const totalScore = gameState.health + gameState.gold + (gameState.exp * 2);
-            let rank = '';
+        function getEnding() {
+            const { health, gold, exp, flags, items } = gameState;
             
-            if (totalScore >= 300) rank = '전설의 모험가';
-            else if (totalScore >= 250) rank = '숙련된 모험가';
-            else if (totalScore >= 200) rank = '경험있는 모험가';
-            else if (totalScore >= 150) rank = '초보 모험가';
-            else rank = '견습 모험가';
+            // 아이템 기반 특별 엔딩들
+            if (items.healing_potion >= 3 && items.lucky_charm >= 2) {
+                return {
+                    title: '🎒 수집가 엔딩',
+                    description: '도리는 희귀한 아이템들을 모으는 것에 특별한 재능을 보였다. 이제 그는 전설적인 보물 사냥꾼으로 알려져 있다.',
+                    emoji: '💼'
+                };
+            }
+            
+            if (items.healing_potion >= 5) {
+                return {
+                    title: '💊 연금술사 엔딩',
+                    description: '도리는 수많은 물약을 모으며 연금술의 비밀을 깨달았다. 이제 그는 마을의 위대한 연금술사가 되었다.',
+                    emoji: '⚗️'
+                };
+            }
+            
+            if (items.lucky_charm >= 3) {
+                return {
+                    title: '🍀 행운아 엔딩',
+                    description: '도리는 행운의 부적들을 모으며 진정한 행운을 손에 넣었다. 앞으로 그에게는 좋은 일만 일어날 것이다.',
+                    emoji: '🌈'
+                };
+            }
+            
+            // 특별한 조건들을 먼저 확인
+            if (flags.robbed_merchant && flags.bullied_children) {
+                return {
+                    title: '🌑 악역 엔딩',
+                    description: '도리는 악한 행동을 일삼아 마을 사람들에게 미움받게 되었다. 하지만 때로는 악역도 필요하다는 것을 깨달았다.',
+                    emoji: '😈'
+                };
+            }
+            
+            if (flags.helped_children && flags.helped_traveler && flags.helped_lost_child) {
+                return {
+                    title: '👑 성인 엔딩',
+                    description: '도리는 수많은 사람들을 도우며 마을의 성인으로 추앙받게 되었다. 그의 선행은 전설이 되어 후세에 전해졌다.',
+                    emoji: '👼'
+                };
+            }
+            
+            // 스탯 기반 엔딩
+            if (gold >= 200) {
+                return {
+                    title: '💰 부자 엔딩',
+                    description: '도리는 모험을 통해 막대한 부를 축적했다. 이제 그는 마을의 가장 부유한 상인이 되어 편안한 삶을 살게 되었다.',
+                    emoji: '💎'
+                };
+            }
+            
+            if (exp >= 150) {
+                return {
+                    title: '📚 현자 엔딩',
+                    description: '도리는 수많은 경험을 통해 지혜를 얻었다. 이제 그는 마을의 현자가 되어 젊은 모험가들에게 조언을 해주고 있다.',
+                    emoji: '🧙‍♂️'
+                };
+            }
+            
+            if (health >= 90 && exp >= 80 && gold >= 100) {
+                return {
+                    title: '⚔️ 영웅 엔딩',
+                    description: '도리는 균형잡힌 성장을 이루어 진정한 영웅이 되었다. 그의 이름은 모든 이들의 입에 오르내린다.',
+                    emoji: '🦸‍♂️'
+                };
+            }
+            
+            if (health <= 30) {
+                return {
+                    title: '🏥 생존자 엔딩',
+                    description: '도리는 위험한 모험을 겪으며 간신히 살아남았다. 비록 상처투성이지만 소중한 경험을 얻었다.',
+                    emoji: '🩹'
+                };
+            }
+            
+            if (gold <= 30 && exp <= 50) {
+                return {
+                    title: '🌱 초심자 엔딩',
+                    description: '도리는 아직 초보 모험가다. 하지만 모든 위대한 영웅도 작은 시작에서 출발한다는 것을 잊지 말자.',
+                    emoji: '🌿'
+                };
+            }
+            
+            // 기본 엔딩
+            const totalScore = health + gold + (exp * 2);
+            if (totalScore >= 300) {
+                return {
+                    title: '🌟 전설 엔딩',
+                    description: '도리는 전설적인 모험가가 되었다. 그의 이야기는 영원히 기억될 것이다.',
+                    emoji: '✨'
+                };
+            } else if (totalScore >= 200) {
+                return {
+                    title: '🎖️ 숙련자 엔딩',
+                    description: '도리는 숙련된 모험가로 성장했다. 이제 더 큰 모험이 그를 기다리고 있다.',
+                    emoji: '🏅'
+                };
+            } else {
+                return {
+                    title: '🚶‍♂️ 평범한 엔딩',
+                    description: '도리는 평범하지만 의미있는 모험을 마쳤다. 때로는 평범함도 하나의 축복이다.',
+                    emoji: '😊'
+                };
+            }
+        }
+
+        function showGameEnd() {
+            const ending = getEnding();
+            const totalScore = gameState.health + gameState.gold + (gameState.exp * 2);
             
             document.getElementById('story-text').textContent = 
                 `도리의 모험이 끝났다!\n\n` +
+                `${ending.emoji} ${ending.title}\n\n` +
+                `${ending.description}\n\n` +
                 `=== 최종 결과 ===\n` +
                 `체력: ${gameState.health}\n` +
                 `골드: ${gameState.gold}\n` +
-                `경험치: ${gameState.exp}\n\n` +
-                `총점: ${totalScore}점\n` +
-                `등급: ${rank}\n\n` +
-                `모든 이벤트를 경험한 도리는 집으로 돌아갔다.`;
+                `경험치: ${gameState.exp}\n` +
+                `총점: ${totalScore}점`;
             
             const choicesDiv = document.getElementById('choices');
             choicesDiv.innerHTML = '';
