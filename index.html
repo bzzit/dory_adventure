@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>도리의 모험</title>
+    <title>텍스트 어드벤처 게임</title>
     <style>
         body {
             font-family: 'Malgun Gothic', Arial, sans-serif;
@@ -50,15 +50,27 @@
         
         .event-image {
             background-color: #2a2a2a;
-            padding: 20px;
+            padding: 15px;
             border-radius: 5px;
             margin-bottom: 15px;
             text-align: center;
-            font-family: monospace;
-            font-size: 12px;
-            line-height: 1.2;
-            color: #a0a0a0;
             border: 1px solid #555;
+            max-height: 200px;
+            overflow: hidden;
+        }
+        
+        .event-image img {
+            width: 100%;
+            max-width: 300px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+            filter: sepia(20%) saturate(70%) hue-rotate(10deg) brightness(1.1);
+        }
+        
+        .image-loading {
+            color: #a0a0a0;
+            font-style: italic;
         }
         
         .choices {
@@ -200,7 +212,7 @@
             {
                 id: 'merchant',
                 text: '도리는 여행 중 늙은 상인을 만났다.\n\n상인: "이 신비한 물약을 사시겠습니까? 단 30골드입니다."',
-                
+                imageQuery: 'old merchant watercolor fantasy bottles potions',
                 choices: [
                     { text: '물약을 산다', cost: 30, effect: () => ({}), probability: 100, flag: 'bought_potion', item: 'healing_potion' },
                     { text: '안 산다', effect: () => ({}), probability: 100 },
@@ -210,6 +222,7 @@
             {
                 id: 'children',
                 text: '도리는 아이들이 놀이를 하는 것을 발견했다.\n\n아이들이 즐겁게 공놀이를 하고 있다.',
+                imageQuery: 'children playing watercolor happy kids ball game',
                 choices: [
                     { text: '함께 놀아준다', effect: () => ({ exp: 10 }), probability: 100, flag: 'helped_children' },
                     { text: '그냥 지나친다', effect: () => ({}), probability: 100 },
@@ -219,6 +232,7 @@
             {
                 id: 'treasure',
                 text: '도리는 길가에서 반짝이는 무언가를 발견했다.\n\n땅에 묻힌 작은 보물상자가 보인다.',
+                imageQuery: 'treasure chest watercolor buried ground sparkling',
                 choices: [
                     { text: '상자를 판다', effect: () => ({ gold: 25, exp: 5 }), probability: 100 },
                     { text: '무시하고 지나간다', effect: () => ({}), probability: 100 },
@@ -265,6 +279,7 @@
             {
                 id: 'tavern',
                 text: '도리는 시끌벅적한 여관에 도착했다.\n\n여관 주인이 반갑게 맞아준다.',
+                imageQuery: 'medieval tavern watercolor cozy inn warm light',
                 choices: [
                     { text: '식사를 한다 (20골드)', cost: 20, effect: () => ({ health: 25 }), probability: 100 },
                     { text: '정보를 수집한다', effect: () => ({ exp: 8 }), probability: 100 },
@@ -274,6 +289,7 @@
             {
                 id: 'bandits',
                 text: '도리 앞에 산적들이 나타났다!\n\n산적: "지나가려면 통행료를 내놔!"',
+                imageQuery: 'bandits robbers watercolor medieval dangerous',
                 choices: [
                     { text: '돈을 준다 (25골드)', cost: 25, effect: () => ({}), probability: 100 },
                     { text: '싸운다 (성공확률 45%)', effect: () => ({}), probability: 45, success: () => ({ gold: 35, exp: 15 }), failure: () => ({ health: -25, gold: -15 }) },
@@ -301,6 +317,7 @@
             {
                 id: 'magic_shop',
                 text: '도리는 신비한 마법 상점을 발견했다.\n\n마법사: "어서오세요! 특별한 물건들을 판매하고 있습니다."',
+                imageQuery: 'magic shop watercolor wizard potions mystical',
                 choices: [
                     { text: '체력 물약을 산다 (40골드)', cost: 40, effect: () => ({}), probability: 100, item: 'healing_potion' },
                     { text: '행운의 부적을 산다 (60골드)', cost: 60, effect: () => ({}), probability: 100, item: 'lucky_charm' },
@@ -388,6 +405,36 @@
             updateInventoryDisplay();
         }
         
+        async function loadEventImage(imageQuery) {
+            const eventImageDiv = document.getElementById('event-image');
+            
+            if (!imageQuery) {
+                eventImageDiv.style.display = 'none';
+                return;
+            }
+            
+            eventImageDiv.style.display = 'block';
+            eventImageDiv.innerHTML = '<div class="image-loading">이미지 로딩 중...</div>';
+            
+            try {
+                // Unsplash API 무료 버전 사용 (API 키 없이)
+                const query = encodeURIComponent(imageQuery);
+                const imageUrl = `https://source.unsplash.com/300x150/?${query}`;
+                
+                const img = new Image();
+                img.onload = () => {
+                    eventImageDiv.innerHTML = `<img src="${imageUrl}" alt="${imageQuery}">`;
+                };
+                img.onerror = () => {
+                    eventImageDiv.innerHTML = '<div class="image-loading">이미지를 불러올 수 없습니다</div>';
+                };
+                img.src = imageUrl;
+                
+            } catch (error) {
+                eventImageDiv.innerHTML = '<div class="image-loading">이미지 로딩 실패</div>';
+            }
+        }
+        
         function updateInventoryDisplay() {
             const inventoryItems = document.getElementById('inventory-items');
             const items = gameState.items;
@@ -453,6 +500,13 @@
             
             gameState.currentEvent = event;
             gameState.usedEvents.push(event.id);
+            
+            // 이미지 로드
+            if (event.imageQuery) {
+                loadEventImage(event.imageQuery);
+            } else {
+                document.getElementById('event-image').style.display = 'none';
+            }
             
             document.getElementById('story-text').textContent = event.text;
             
