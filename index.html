@@ -446,13 +446,39 @@
             
             let itemsHtml = '';
             if (items.healing_potion > 0) {
-                itemsHtml += `<div class="item">🧪 체력 물약 x${items.healing_potion}</div>`;
+                itemsHtml += `<div class="item" onclick="useHealingPotion()" style="cursor: pointer; border: 1px solid #777;">🧪 체력 물약 x${items.healing_potion} (클릭하여 사용)</div>`;
             }
             if (items.lucky_charm > 0) {
                 itemsHtml += `<div class="item">🍀 행운의 부적 x${items.lucky_charm}</div>`;
             }
             
             inventoryItems.innerHTML = itemsHtml;
+        }
+        
+        function useHealingPotion() {
+            // 체력물약이 없거나 체력이 이미 최대인 경우
+            if (!gameState.items.healing_potion || gameState.items.healing_potion <= 0) {
+                alert('사용할 체력물약이 없습니다.');
+                return;
+            }
+            
+            if (gameState.health >= 100) {
+                alert('체력이 이미 최대입니다.');
+                return;
+            }
+            
+            // 체력물약 사용
+            gameState.items.healing_potion--;
+            const healAmount = 10;
+            const oldHealth = gameState.health;
+            gameState.health = Math.min(100, gameState.health + healAmount);
+            const actualHeal = gameState.health - oldHealth;
+            
+            // 화면 업데이트
+            updateStats();
+            
+            // 사용 결과 메시지
+            alert(`체력물약을 사용했습니다! 체력이 ${actualHeal} 회복되었습니다.`);
         }
         
         function toggleInventory() {
